@@ -3,10 +3,14 @@ package io.jarv.docgen.builder;
 import io.jarv.docgen.style.Alignment;
 import io.jarv.docgen.style.ParagraphStyle;
 import io.jarv.docgen.style.TextStyle;
-import org.apache.poi.xwpf.usermodel.ParagraphAlignment;
-import org.apache.poi.xwpf.usermodel.UnderlinePatterns;
-import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import jakarta.xml.bind.JAXBElement;
+import org.docx4j.wml.Br;
+import org.docx4j.wml.JcEnumeration;
+import org.docx4j.wml.R;
+import org.docx4j.wml.UnderlineEnumeration;
 import org.junit.jupiter.api.Test;
+
+import java.math.BigInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -15,32 +19,35 @@ class ParagraphBuilderTest {
     @Test
     void centerAlignmentIsPersisted() throws Exception {
         ParagraphStyle centered = ParagraphStyle.builder().alignment(Alignment.CENTER).build();
-        try (XWPFDocument round = RoundTrip.of(b -> b.beginParagraph(centered)
+        try (RoundTrip.Doc round = RoundTrip.of(b -> b.beginParagraph(centered)
                 .addRun("x", TextStyle.defaults()).endParagraph())) {
-            assertThat(round.getParagraphs().get(0).getAlignment())
-                    .isEqualTo(ParagraphAlignment.CENTER);
+            assertThat(round.paragraphs().get(0).getPPr().getJc().getVal())
+                    .isEqualTo(JcEnumeration.CENTER);
         }
     }
 
     @Test
-    void justifyMapsToPoiBoth() throws Exception {
+    void justifyMapsToBoth() throws Exception {
         ParagraphStyle justified = ParagraphStyle.builder().alignment(Alignment.JUSTIFY).build();
-        try (XWPFDocument round = RoundTrip.of(b -> b.beginParagraph(justified)
+        try (RoundTrip.Doc round = RoundTrip.of(b -> b.beginParagraph(justified)
                 .addRun("x", TextStyle.defaults()).endParagraph())) {
-            assertThat(round.getParagraphs().get(0).getAlignment())
-                    .isEqualTo(ParagraphAlignment.BOTH);
+            assertThat(round.paragraphs().get(0).getPPr().getJc().getVal())
+                    .isEqualTo(JcEnumeration.BOTH);
         }
     }
 
     @Test
     void addLineBreakInsertsExactlyOneBreak() throws Exception {
-        try (XWPFDocument round = RoundTrip.of(b -> b.beginParagraph()
+        try (RoundTrip.Doc round = RoundTrip.of(b -> b.beginParagraph()
                 .addRun("line1", TextStyle.defaults())
                 .addLineBreak()
                 .addRun("line2", TextStyle.defaults())
                 .endParagraph())) {
-            long breaks = round.getParagraphs().get(0).getRuns().stream()
-                    .mapToLong(r -> r.getCTR().getBrList().size()).sum();
+            long breaks = RoundTrip.filter(round.paragraphs().get(0).getContent(), R.class).stream()
+                    .flatMap(r -> r.getContent().stream())
+                    .map(o -> (o instanceof JAXBElement<?> je) ? je.getValue() : o)
+                    .filter(Br.class::isInstance)
+                    .count();
             assertThat(breaks).isEqualTo(1);
         }
     }
@@ -48,18 +55,19 @@ class ParagraphBuilderTest {
     @Test
     void indentAppliedInTwips() throws Exception {
         ParagraphStyle indented = ParagraphStyle.builder().indentLeft(0.5).build();
-        try (XWPFDocument round = RoundTrip.of(b -> b.beginParagraph(indented)
+        try (RoundTrip.Doc round = RoundTrip.of(b -> b.beginParagraph(indented)
                 .addRun("x", TextStyle.defaults()).endParagraph())) {
-            assertThat(round.getParagraphs().get(0).getIndentationLeft()).isEqualTo(720);
+            assertThat(round.paragraphs().get(0).getPPr().getInd().getLeft())
+                    .isEqualTo(BigInteger.valueOf(720));
         }
     }
 
     @Test
     void underlineFlagIsAppliedToRun() throws Exception {
         TextStyle underlined = TextStyle.builder().underline(true).build();
-        try (XWPFDocument round = RoundTrip.of(b -> b.addText("x", underlined))) {
-            assertThat(round.getParagraphs().get(0).getRuns().get(0).getUnderline())
-                    .isEqualTo(UnderlinePatterns.SINGLE);
+        try (RoundTrip.Doc round = RoundTrip.of(b -> b.addText("x", underlined))) {
+            R run = WordDocumentBuilderTest.firstRun(round.paragraphs().get(0));
+            assertThat(run.getRPr().getU().getVal()).isEqualTo(UnderlineEnumeration.SINGLE);
         }
     }
 }

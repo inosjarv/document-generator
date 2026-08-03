@@ -3,11 +3,17 @@ package io.jarv.docgen.builder;
 import io.jarv.docgen.style.Border;
 import io.jarv.docgen.style.TableStyle;
 import io.jarv.docgen.style.TextStyle;
-import org.apache.poi.xwpf.usermodel.XWPFDocument;
-import org.apache.poi.xwpf.usermodel.XWPFTable;
-import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTblBorders;
-import org.openxmlformats.schemas.wordprocessingml.x2006.main.STBorder;
+import org.docx4j.wml.P;
+import org.docx4j.wml.R;
+import org.docx4j.wml.STBorder;
+import org.docx4j.wml.Tbl;
+import org.docx4j.wml.TblBorders;
+import org.docx4j.wml.Tc;
+import org.docx4j.wml.Text;
+import org.docx4j.wml.Tr;
 import org.junit.jupiter.api.Test;
+
+import jakarta.xml.bind.JAXBElement;
 
 import java.math.BigInteger;
 
@@ -17,7 +23,7 @@ class TableBuilderTest {
 
     @Test
     void twoRowsTwoColumnsProducesCorrectStructure() throws Exception {
-        try (XWPFDocument round = RoundTrip.of(b -> b.beginTable(TableStyle.bordered())
+        try (RoundTrip.Doc round = RoundTrip.of(b -> b.beginTable(TableStyle.bordered())
                 .beginRow()
                 .addCell("A1", TextStyle.defaults())
                 .addCell("B1", TextStyle.defaults())
@@ -28,25 +34,27 @@ class TableBuilderTest {
                 .endRow()
                 .endTable())) {
 
-            XWPFTable table = round.getTables().get(0);
-            assertThat(table.getRows()).hasSize(2);
-            assertThat(table.getRow(0).getTableCells()).hasSize(2);
-            assertThat(table.getRow(0).getCell(0).getText()).isEqualTo("A1");
-            assertThat(table.getRow(0).getCell(1).getText()).isEqualTo("B1");
-            assertThat(table.getRow(1).getCell(0).getText()).isEqualTo("A2");
-            assertThat(table.getRow(1).getCell(1).getText()).isEqualTo("B2");
+            Tbl table = round.tables().get(0);
+            var rows = RoundTrip.filter(table.getContent(), Tr.class);
+            assertThat(rows).hasSize(2);
+            var row0Cells = RoundTrip.filter(rows.get(0).getContent(), Tc.class);
+            assertThat(row0Cells).hasSize(2);
+            assertThat(cellText(row0Cells.get(0))).isEqualTo("A1");
+            assertThat(cellText(row0Cells.get(1))).isEqualTo("B1");
+
+            var row1Cells = RoundTrip.filter(rows.get(1).getContent(), Tc.class);
+            assertThat(cellText(row1Cells.get(0))).isEqualTo("A2");
+            assertThat(cellText(row1Cells.get(1))).isEqualTo("B2");
         }
     }
 
     @Test
     void borderedTableSetsSingleOnAllSides() throws Exception {
-        try (XWPFDocument round = RoundTrip.of(b -> b.beginTable(TableStyle.bordered())
-                .beginRow()
-                .addCell("x", TextStyle.defaults())
-                .endRow()
+        try (RoundTrip.Doc round = RoundTrip.of(b -> b.beginTable(TableStyle.bordered())
+                .beginRow().addCell("x", TextStyle.defaults()).endRow()
                 .endTable())) {
 
-            CTTblBorders borders = round.getTables().get(0).getCTTbl().getTblPr().getTblBorders();
+            TblBorders borders = round.tables().get(0).getTblPr().getTblBorders();
             assertThat(borders.getTop().getVal()).isEqualTo(STBorder.SINGLE);
             assertThat(borders.getBottom().getVal()).isEqualTo(STBorder.SINGLE);
             assertThat(borders.getLeft().getVal()).isEqualTo(STBorder.SINGLE);
@@ -58,13 +66,11 @@ class TableBuilderTest {
 
     @Test
     void borderlessTableSetsNoneOnAllSides() throws Exception {
-        try (XWPFDocument round = RoundTrip.of(b -> b.beginTable(TableStyle.borderless())
-                .beginRow()
-                .addCell("x", TextStyle.defaults())
-                .endRow()
+        try (RoundTrip.Doc round = RoundTrip.of(b -> b.beginTable(TableStyle.borderless())
+                .beginRow().addCell("x", TextStyle.defaults()).endRow()
                 .endTable())) {
 
-            CTTblBorders borders = round.getTables().get(0).getCTTbl().getTblPr().getTblBorders();
+            TblBorders borders = round.tables().get(0).getTblPr().getTblBorders();
             assertThat(borders.getTop().getVal()).isEqualTo(STBorder.NONE);
             assertThat(borders.getInsideH().getVal()).isEqualTo(STBorder.NONE);
         }
@@ -72,12 +78,12 @@ class TableBuilderTest {
 
     @Test
     void outerOnlyLeavesInnerNone() throws Exception {
-        try (XWPFDocument round = RoundTrip.of(b -> b.beginTable(TableStyle.outerOnly())
+        try (RoundTrip.Doc round = RoundTrip.of(b -> b.beginTable(TableStyle.outerOnly())
                 .beginRow().addCell("a", TextStyle.defaults()).endRow()
                 .beginRow().addCell("b", TextStyle.defaults()).endRow()
                 .endTable())) {
 
-            CTTblBorders borders = round.getTables().get(0).getCTTbl().getTblPr().getTblBorders();
+            TblBorders borders = round.tables().get(0).getTblPr().getTblBorders();
             assertThat(borders.getTop().getVal()).isEqualTo(STBorder.SINGLE);
             assertThat(borders.getInsideH().getVal()).isEqualTo(STBorder.NONE);
         }
@@ -89,14 +95,27 @@ class TableBuilderTest {
                 .outer(Border.builder().widthPoints(2.0).colorHex("FF0000").build())
                 .inner(Border.none())
                 .build();
-        try (XWPFDocument round = RoundTrip.of(b -> b.beginTable(style)
+        try (RoundTrip.Doc round = RoundTrip.of(b -> b.beginTable(style)
                 .beginRow().addCell("x", TextStyle.defaults()).endRow()
                 .endTable())) {
 
-            var top = round.getTables().get(0).getCTTbl().getTblPr().getTblBorders().getTop();
+            var top = round.tables().get(0).getTblPr().getTblBorders().getTop();
             // 2pt → 16 eighths of a point
             assertThat(top.getSz()).isEqualTo(BigInteger.valueOf(16));
-            assertThat(top.xgetColor().getStringValue()).isEqualTo("FF0000");
+            assertThat(top.getColor()).isEqualTo("FF0000");
         }
+    }
+
+    private static String cellText(Tc cell) {
+        StringBuilder sb = new StringBuilder();
+        for (P p : RoundTrip.filter(cell.getContent(), P.class)) {
+            for (R r : RoundTrip.filter(p.getContent(), R.class)) {
+                for (Object o : r.getContent()) {
+                    Object unwrapped = (o instanceof JAXBElement<?> je) ? je.getValue() : o;
+                    if (unwrapped instanceof Text t) sb.append(t.getValue());
+                }
+            }
+        }
+        return sb.toString();
     }
 }

@@ -1,39 +1,41 @@
 package io.jarv.docgen.builder;
 
 import io.jarv.docgen.style.TextStyle;
-import org.apache.poi.xwpf.usermodel.XWPFParagraph;
-import org.apache.poi.xwpf.usermodel.XWPFRun;
-import org.apache.poi.xwpf.usermodel.XWPFTableCell;
-import org.apache.poi.xwpf.usermodel.XWPFTableRow;
+import org.docx4j.wml.ObjectFactory;
+import org.docx4j.wml.P;
+import org.docx4j.wml.R;
+import org.docx4j.wml.Tc;
+import org.docx4j.wml.Text;
+import org.docx4j.wml.Tr;
 
 import java.util.Objects;
 
 public class RowBuilder {
 
     private final TableBuilder parent;
-    private final XWPFTableRow row;
-    private int nextCellIndex = 0;
+    private final Tr row;
 
-    RowBuilder(TableBuilder parent, XWPFTableRow row) {
+    RowBuilder(TableBuilder parent, Tr row) {
         this.parent = parent;
         this.row = row;
     }
 
-    /**
-     * Add a cell with a single-run paragraph. Reuses cells POI created implicitly (each new row
-     * inherits the column count of the first row) before creating additional ones.
-     */
     public RowBuilder addCell(String text, TextStyle style) {
         Objects.requireNonNull(style, "style");
-        XWPFTableCell cell = (nextCellIndex < row.getTableCells().size())
-                ? row.getCell(nextCellIndex)
-                : row.createCell();
+        Tc cell = WordDocumentBuilder.FACTORY.createTc();
 
-        XWPFParagraph paragraph = cell.getParagraphs().get(0);
-        XWPFRun run = paragraph.createRun();
-        run.setText(text != null ? text : "");
+        P paragraph = WordDocumentBuilder.FACTORY.createP();
+        R run = WordDocumentBuilder.FACTORY.createR();
         ParagraphBuilder.applyTextStyle(run, style);
-        nextCellIndex++;
+        Text t = WordDocumentBuilder.FACTORY.createText();
+        t.setValue(text != null ? text : "");
+        t.setSpace("preserve");
+        run.getContent().add(WordDocumentBuilder.FACTORY.createRT(t));
+        paragraph.getContent().add(run);
+
+        cell.getContent().add(paragraph);
+        row.getContent().add(cell);
+        parent.recordCellForColumnCount();
         return this;
     }
 

@@ -1,44 +1,74 @@
 package io.jarv.docgen.builder;
 
-import io.jarv.docgen.internal.PoiTableBorders;
+import io.jarv.docgen.internal.Docx4jTableBorders;
 import io.jarv.docgen.style.TableStyle;
-import org.apache.poi.xwpf.usermodel.XWPFTable;
-import org.apache.poi.xwpf.usermodel.XWPFTableRow;
+import org.docx4j.wml.CTTblLayoutType;
+import org.docx4j.wml.STTblLayoutType;
+import org.docx4j.wml.Tbl;
+import org.docx4j.wml.TblGrid;
+import org.docx4j.wml.TblGridCol;
+import org.docx4j.wml.TblPr;
+import org.docx4j.wml.TblWidth;
+import org.docx4j.wml.Tr;
+
+import java.math.BigInteger;
 
 public class TableBuilder {
 
     private final WordDocumentBuilder parent;
-    private final XWPFTable table;
-    private boolean firstRowClaimed = false;
+    private final Tbl table;
+    private int firstRowCellCount = 0;
+    private int currentRowCellCount = 0;
+    private boolean firstRowFinalized = false;
 
-    TableBuilder(WordDocumentBuilder parent, XWPFTable table, TableStyle style) {
+    TableBuilder(WordDocumentBuilder parent, Tbl table, TableStyle style) {
         this.parent = parent;
         this.table = table;
         applyStyle(style);
     }
 
     private void applyStyle(TableStyle style) {
-        table.setWidth(style.getWidthPercent());
-        PoiTableBorders.apply(table, style.getOuter(), style.getInner());
+        TblPr tblPr = new TblPr();
+
+        TblWidth width = new TblWidth();
+        String widthPct = style.getWidthPercent().replace("%", "");
+        // OOXML pct type: value = fiftieths of a percent (100% = 5000).
+        width.setW(BigInteger.valueOf((long) (Double.parseDouble(widthPct) * 50)));
+        width.setType("pct");
+        tblPr.setTblW(width);
+
+        CTTblLayoutType layout = new CTTblLayoutType();
+        layout.setType(STTblLayoutType.AUTOFIT);
+        tblPr.setTblLayout(layout);
+
+        Docx4jTableBorders.apply(tblPr, style.getOuter(), style.getInner());
+        table.setTblPr(tblPr);
     }
 
-    /**
-     * Start a new row. POI creates a default 1x1 row when the table is constructed — the first
-     * {@code beginRow} reuses it; subsequent calls create fresh rows (which inherit the column
-     * count of row 0).
-     */
     public RowBuilder beginRow() {
-        XWPFTableRow row;
-        if (!firstRowClaimed) {
-            row = table.getRow(0);
-            firstRowClaimed = true;
-        } else {
-            row = table.createRow();
+        if (!firstRowFinalized) {
+            firstRowFinalized = firstRowCellCount > 0;
+            firstRowCellCount = currentRowCellCount > firstRowCellCount
+                    ? currentRowCellCount
+                    : firstRowCellCount;
         }
+        currentRowCellCount = 0;
+        Tr row = WordDocumentBuilder.FACTORY.createTr();
+        table.getContent().add(row);
         return new RowBuilder(this, row);
     }
 
+    void recordCellForColumnCount() {
+        currentRowCellCount++;
+    }
+
     public WordDocumentBuilder endTable() {
+        int columns = Math.max(firstRowCellCount, currentRowCellCount);
+        TblGrid grid = new TblGrid();
+        for (int i = 0; i < columns; i++) {
+            grid.getGridCol().add(new TblGridCol());
+        }
+        table.setTblGrid(grid);
         return parent;
     }
 }
