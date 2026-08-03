@@ -24,8 +24,10 @@ public class DocumentTheme {
 
     public static DocumentTheme corporate() {
         return builder()
-                .primaryColor("2C3E50")
-                .secondaryColor("7F8C8D")
+                .primaryColor("B91C1C")       // crimson — strong red for headings
+                .secondaryColor("78350F")     // warm brown — pairs with the red without clashing
+                .defaultLineSpacing(1.3)
+                .marginHeader(0.6)
                 .build();
     }
 

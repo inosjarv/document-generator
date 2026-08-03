@@ -1,6 +1,7 @@
 package io.jarv.docgen.examples;
 
 import io.jarv.docgen.builder.WordDocumentBuilder;
+import io.jarv.docgen.style.Alignment;
 import io.jarv.docgen.style.Border;
 import io.jarv.docgen.style.BorderSet;
 import io.jarv.docgen.style.DocumentTheme;
@@ -11,13 +12,10 @@ import io.jarv.docgen.style.TableStyle;
 import io.jarv.docgen.style.TextStyle;
 import lombok.extern.slf4j.Slf4j;
 
-import javax.imageio.ImageIO;
-import java.awt.Color;
-import java.awt.Graphics2D;
-import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.util.Objects;
 
 @Slf4j
 public class DemoGenerator {
@@ -50,7 +48,9 @@ public class DemoGenerator {
                 .spaceBefore(6.0).spaceAfter(6.0)
                 .build();
 
-        String outputPath = "Generated_Report_Test.docx";
+        byte[] spidermanBytes = loadSpiderman();
+
+        String outputPath = "Generated_Report_Test-%s.docx".formatted(System.currentTimeMillis());
         try (
                 FileOutputStream fos = new FileOutputStream(outputPath);
                 WordDocumentBuilder builder = new WordDocumentBuilder(theme)) {
@@ -62,8 +62,8 @@ public class DemoGenerator {
 
                     .addText("Executive Summary", headingStyle, titleBlock)
                     .addText(
-                            "This document was generated purely via Apache POI using a fluent builder pattern. "
-                                    + "The line spacing here is the default 1.15x as defined by the DocumentTheme.",
+                            "This document was generated via docx4j using a fluent builder pattern. "
+                                    + "The line spacing here is defined by the DocumentTheme.",
                             bodyStyle)
                     .beginParagraph(doubleSpaced)
                     .addRun("This paragraph is ", bodyStyle)
@@ -89,9 +89,12 @@ public class DemoGenerator {
                     .endRow()
                     .endTable()
 
-                    .addImage(new ByteArrayInputStream(swatchPng(theme.getPrimaryColor())),
+                    .addImage(new ByteArrayInputStream(spidermanBytes),
                             PictureType.PNG,
-                            ImageStyle.builder().widthPx(120).heightPx(30).build());
+                            ImageStyle.builder()
+                                    .widthPx(200).heightPx(200)
+                                    .alignment(Alignment.CENTER)
+                                    .build());
 
             if (log.isDebugEnabled()) {
                 log.debug("\n{}", builder.debugXmlDump());
@@ -105,18 +108,13 @@ public class DemoGenerator {
         }
     }
 
-    private static byte[] swatchPng(String hex) {
-        try {
-            BufferedImage img = new BufferedImage(120, 30, BufferedImage.TYPE_INT_ARGB);
-            Graphics2D g = img.createGraphics();
-            g.setColor(Color.decode("#" + hex));
-            g.fillRect(0, 0, 120, 30);
-            g.dispose();
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            ImageIO.write(img, "png", out);
-            return out.toByteArray();
+    private static byte[] loadSpiderman() {
+        try (InputStream in = Objects.requireNonNull(
+                DemoGenerator.class.getResourceAsStream("/spiderman.png"),
+                "spiderman.png not found on the classpath under /spiderman.png")) {
+            return in.readAllBytes();
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("failed to load spiderman.png", e);
         }
     }
 }

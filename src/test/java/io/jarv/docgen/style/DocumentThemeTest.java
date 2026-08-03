@@ -18,8 +18,10 @@ class DocumentThemeTest {
     @Test
     void corporatePresetOverridesColorsAndKeepsMarginDefaults() {
         DocumentTheme theme = DocumentTheme.corporate();
-        assertThat(theme.getPrimaryColor()).isEqualTo("2C3E50");
-        assertThat(theme.getSecondaryColor()).isEqualTo("7F8C8D");
+        assertThat(theme.getPrimaryColor()).isEqualTo("B91C1C");
+        assertThat(theme.getSecondaryColor()).isEqualTo("78350F");
+        assertThat(theme.getDefaultLineSpacing()).isEqualTo(1.3);
+        assertThat(theme.getMarginHeader()).isEqualTo(0.6);
         assertThat(theme.getMarginTop()).isEqualTo(1.5);
     }
 
