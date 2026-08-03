@@ -2,20 +2,26 @@ package io.jarv.docgen.builder;
 
 import io.jarv.docgen.internal.PoiUnits;
 import io.jarv.docgen.style.DocumentTheme;
+import io.jarv.docgen.style.ImageStyle;
 import io.jarv.docgen.style.ParagraphStyle;
+import io.jarv.docgen.style.PictureType;
+import io.jarv.docgen.style.TableStyle;
 import io.jarv.docgen.style.TextStyle;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ooxml.POIXMLDocumentPart;
+import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
 import org.apache.poi.wp.usermodel.HeaderFooterType;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFHeader;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
+import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.apache.xmlbeans.XmlOptions;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPageMar;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTSectPr;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.math.BigInteger;
 import java.util.Objects;
@@ -53,7 +59,12 @@ public class WordDocumentBuilder implements AutoCloseable {
 
     /** Convenience: add a single-run paragraph with default paragraph styling. */
     public WordDocumentBuilder addText(String text, TextStyle style) {
-        return beginParagraph()
+        return addText(text, style, ParagraphStyle.defaults());
+    }
+
+    /** Convenience: add a single-run paragraph with custom paragraph styling (alignment, spacing, indent). */
+    public WordDocumentBuilder addText(String text, TextStyle style, ParagraphStyle paragraphStyle) {
+        return beginParagraph(paragraphStyle)
                 .addRun(text, style)
                 .endParagraph();
     }
@@ -66,6 +77,20 @@ public class WordDocumentBuilder implements AutoCloseable {
         Objects.requireNonNull(style, "style");
         XWPFParagraph paragraph = document.createParagraph();
         return new ParagraphBuilder(this, paragraph, style, theme);
+    }
+
+    public TableBuilder beginTable(TableStyle style) {
+        Objects.requireNonNull(style, "style");
+        XWPFTable table = document.createTable();
+        return new TableBuilder(this, table, style);
+    }
+
+    /** Convenience: add an image in its own paragraph, aligned per {@link ImageStyle#getAlignment()}. */
+    public WordDocumentBuilder addImage(InputStream stream, PictureType type, ImageStyle imageStyle)
+            throws IOException, InvalidFormatException {
+        Objects.requireNonNull(imageStyle, "imageStyle");
+        ParagraphStyle wrapper = ParagraphStyle.builder().alignment(imageStyle.getAlignment()).build();
+        return beginParagraph(wrapper).addImage(stream, type, imageStyle).endParagraph();
     }
 
     public HeaderBuilder beginHeader() {

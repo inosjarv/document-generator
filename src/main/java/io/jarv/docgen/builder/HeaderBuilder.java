@@ -1,6 +1,7 @@
 package io.jarv.docgen.builder;
 
 import io.jarv.docgen.style.DocumentTheme;
+import io.jarv.docgen.style.ImageStyle;
 import io.jarv.docgen.style.PictureType;
 import io.jarv.docgen.style.TextStyle;
 import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
@@ -45,13 +46,14 @@ public class HeaderBuilder {
         table.setInsideVBorder(XWPFTable.XWPFBorderType.NONE, 0, 0, "auto");
     }
 
-    public HeaderBuilder addLeftImage(InputStream imageStream, PictureType type, int widthPx, int heightPx)
+    public HeaderBuilder addLeftImage(InputStream imageStream, PictureType type, ImageStyle imageStyle)
             throws IOException, InvalidFormatException {
         Objects.requireNonNull(imageStream, "imageStream");
         Objects.requireNonNull(type, "type");
+        Objects.requireNonNull(imageStyle, "imageStyle");
         XWPFRun run = leftParagraph.createRun();
         run.addPicture(imageStream, type.poiType(), "image." + type.extension(),
-                Units.toEMU(widthPx), Units.toEMU(heightPx));
+                Units.toEMU(imageStyle.getWidthPx()), Units.toEMU(imageStyle.getHeightPx()));
         return this;
     }
 

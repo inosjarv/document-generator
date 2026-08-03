@@ -21,5 +21,8 @@ public class ParagraphStyle {
     /** Left indent, in inches. */
     @Builder.Default double indentLeft = 0;
 
+    /** {@code null} means no borders. */
+    BorderSet border;
+
     public static ParagraphStyle defaults() { return builder().build(); }
 }

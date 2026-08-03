@@ -1,6 +1,7 @@
 package io.jarv.docgen.builder;
 
 import io.jarv.docgen.style.DocumentTheme;
+import io.jarv.docgen.style.ParagraphStyle;
 import io.jarv.docgen.style.TextStyle;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
@@ -97,6 +98,24 @@ class WordDocumentBuilderTest {
         try (WordDocumentBuilder builder = new WordDocumentBuilder()) {
             assertThatThrownBy(() -> builder.writeTo(null))
                     .isInstanceOf(NullPointerException.class);
+        }
+    }
+
+    @Test
+    void titleParagraphKeepsConfigurableSpaceAfterInPoints() throws Exception {
+        TextStyle bold = TextStyle.builder().bold(true).fontSize(16).build();
+        TextStyle body = TextStyle.defaults();
+        ParagraphStyle titleBlock = ParagraphStyle.builder().spaceAfter(6.0).build();
+
+        try (XWPFDocument round = RoundTrip.of(b -> b
+                .addText("Title", bold, titleBlock)
+                .addText("Body body body", body))) {
+
+            assertThat(round.getParagraphs()).hasSize(2);
+            // POI stores spacingAfter in twentieths of a point → 6pt = 120.
+            assertThat(round.getParagraphs().get(0).getSpacingAfter()).isEqualTo(120);
+            assertThat(round.getParagraphs().get(0).getRuns().get(0).isBold()).isTrue();
+            assertThat(round.getParagraphs().get(1).getRuns().get(0).isBold()).isFalse();
         }
     }
 
